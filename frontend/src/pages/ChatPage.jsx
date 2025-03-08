@@ -1,114 +1,67 @@
-import React, { useState, useRef, useEffect } from "react";
-import ChatMessage from "../components/ChatMessage";
-import ChatHistory from "../components/ChatHistory";
-import ChatInput from "../components/ChatInput";
+import React, { useState, useEffect, useRef } from 'react';
+import { useDispatch, useSelector } from 'react-redux';
 
-const ChatPage = () => {
-  const [chats, setChats] = useState([]);
-  const [activeChat, setActiveChat] = useState(null);
-  const [inputMessage, setInputMessage] = useState("");
-  const [isLoading, setIsLoading] = useState(false);
-  const messageContainerRef = useRef(null);
+const ChatPage = ({ chatType }) => {
+    const dispatch = useDispatch();
+    const chatMessages = useSelector((state) => state.chat[chatType]);
+    const { loading } = useSelector(state => state.chat);
+    const [message, setMessage] = useState("");
+    const chatContainerRef = useRef(null);
 
-  // Scroll to bottom when messages update
-  useEffect(() => {
-    if (messageContainerRef.current) {
-      messageContainerRef.current.scrollTop = messageContainerRef.current.scrollHeight;
-    }
-  }, [activeChat?.messages]);
+    useEffect(() => {
+        if (chatContainerRef.current) {
+            chatContainerRef.current.scrollTop = chatContainerRef.current.scrollHeight;
+        }
+    }, [chatMessages]);
 
-  // Automatically select the first chat
-  useEffect(() => {
-    if (chats.length > 0 && !activeChat) {
-      setActiveChat(chats[0]);
-    }
-  }, [chats, activeChat]);
+    useEffect(() => {
+        dispatch(getAllChats());
+    }, [dispatch]);
 
-  // Create a new chat
-  const handleNewChat = () => {
-    const newChat = { id: Date.now().toString(), title: "New Conversation", messages: [] };
-    setChats((prev) => [newChat, ...prev]);
-    setActiveChat(newChat);
-  };
+    const handleSendMessage = () => {
+        if (!message.trim()) return;
+        dispatch(sendMessage({ type: chatType, message }));
+        setMessage("");
+    };
 
-  // Delete a chat
-  const handleDeleteChat = (chatId) => {
-    setChats((prev) => prev.filter((chat) => chat.id !== chatId));
-    if (activeChat?.id === chatId) setActiveChat(null);
-  };
+    return (
+        <div className="w-full mx-auto my-6 p-6 bg-white shadow-lg rounded-lg">
+            <h2 className="text-lg font-bold text-gray-800 mb-3">ChatPage ({chatType})</h2>
+            
+            <div ref={chatContainerRef} className="h-96 overflow-y-auto border border-gray-300 p-3 rounded-lg bg-gray-100">
+                {chatMessages && chatMessages.length > 0 ? (
+                    chatMessages.map((chatItem, index) => (
+                        <div
+                            key={index}
+                            className={`mb-2 max-w-[70%] p-2 rounded-lg text-sm ${
+                                chatItem.role === "user" ? "ml-auto bg-blue-200 text-right" : "mr-auto bg-green-200 text-left"
+                            }`}
+                        >
+                            <strong className="text-neutral">{chatItem.role}:</strong>
+                            <MarkdownRenderer markdown={chatItem.msg} />    
+                        </div>
+                    ))
+                ) : (
+                    <p className="text-gray-500">No messages yet...</p>
+                )}
+            </div>
 
-  // Send a message
-  const handleSendMessage = async () => {
-    if (!inputMessage.trim() || !activeChat) return;
-
-    const newMessage = { content: inputMessage, timestamp: new Date().toISOString(), isUser: true };
-
-    setChats((prev) =>
-      prev.map((chat) =>
-        chat.id === activeChat.id ? { ...chat, messages: [...chat.messages, newMessage] } : chat
-      )
+            <div className="mt-4 flex">
+                <input
+                    disabled={loading}
+                    type="text"
+                    value={message}
+                    onChange={(e) => setMessage(e.target.value)}
+                    placeholder="Type a message..."
+                    className="flex-grow p-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400"
+                />
+                <button onClick={handleSendMessage} disabled={loading} className="ml-2 px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition">
+                    {loading ? <span className="loading loading-dots loading-lg"></span> : 'Send'}
+                </button>
+            </div>
+        </div>
     );
-
-    setInputMessage("");
-    setIsLoading(true);
-
-    setTimeout(() => {
-      const aiResponse = { content: "This is a simulated AI response.", timestamp: new Date().toISOString(), isUser: false };
-      setChats((prev) =>
-        prev.map((chat) =>
-          chat.id === activeChat.id ? { ...chat, messages: [...chat.messages, aiResponse] } : chat
-        )
-      );
-      setIsLoading(false);
-    }, 1000);
-  };
-
-  return (
-    <div className="min-h-screen bg-base-100 text-base-content">
-      <div className="flex h-screen">
-        {/* Sidebar */}
-        <div className="w-80 border-r dark:border-gray-700 flex flex-col">
-          <ChatHistory
-            chats={chats}
-            activeChat={activeChat}
-            onSelectChat={setActiveChat}
-            onDeleteChat={handleDeleteChat}
-            onNewChat={handleNewChat}
-          />
-        </div>
-
-        {/* Main Content */}
-        <div className="flex-1 flex flex-col">
-          {/* Header */}
-          <div className="p-4 border-b dark:border-gray-700 flex justify-between items-center">
-            <h2 className="text-xl font-semibold">{activeChat?.title || "Select a chat"}</h2>
-          </div>
-
-          {/* Chat Messages */}
-          <div ref={messageContainerRef} className="flex-1 overflow-y-auto p-4 space-y-4">
-            {activeChat?.messages.map((message, index) => (
-              <ChatMessage key={index} message={message} isUser={message.isUser} />
-            ))}
-            {isLoading && (
-              <div className="flex justify-start">
-                <div className="bg-base-200 rounded-lg p-3 animate-pulse">
-                  <div className="h-4 w-12 bg-base-300 rounded"></div>
-                </div>
-              </div>
-            )}
-          </div>
-
-          {/* Chat Input */}
-          <ChatInput
-            inputMessage={inputMessage}
-            setInputMessage={setInputMessage}
-            handleSendMessage={handleSendMessage}
-            isLoading={isLoading}
-          />
-        </div>
-      </div>
-    </div>
-  );
 };
+
 
 export default ChatPage;
