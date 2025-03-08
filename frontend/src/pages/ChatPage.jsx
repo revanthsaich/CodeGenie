@@ -1,11 +1,9 @@
 import React, { useState, useRef, useEffect } from "react";
 import ChatMessage from "../components/ChatMessage";
 import ChatHistory from "../components/ChatHistory";
-import AudioRecorder from "../components/AudioRecorder";
-import { FaSun, FaMoon, FaPaperPlane } from "react-icons/fa";
+import ChatInput from "../components/ChatInput";
 
 const ChatPage = () => {
-  const [darkMode, setDarkMode] = useState(false);
   const [chats, setChats] = useState([]);
   const [activeChat, setActiveChat] = useState(null);
   const [inputMessage, setInputMessage] = useState("");
@@ -18,6 +16,13 @@ const ChatPage = () => {
       messageContainerRef.current.scrollTop = messageContainerRef.current.scrollHeight;
     }
   }, [activeChat?.messages]);
+
+  // Automatically select the first chat
+  useEffect(() => {
+    if (chats.length > 0 && !activeChat) {
+      setActiveChat(chats[0]);
+    }
+  }, [chats, activeChat]);
 
   // Create a new chat
   const handleNewChat = () => {
@@ -59,8 +64,8 @@ const ChatPage = () => {
   };
 
   return (
-    <div className={`min-h-screen ${darkMode ? "dark" : ""}`}>
-      <div className="flex h-screen bg-base-100 text-base-content">
+    <div className="min-h-screen bg-base-100 text-base-content">
+      <div className="flex h-screen">
         {/* Sidebar */}
         <div className="w-80 border-r dark:border-gray-700 flex flex-col">
           <ChatHistory
@@ -77,13 +82,6 @@ const ChatPage = () => {
           {/* Header */}
           <div className="p-4 border-b dark:border-gray-700 flex justify-between items-center">
             <h2 className="text-xl font-semibold">{activeChat?.title || "Select a chat"}</h2>
-            <button
-              onClick={() => setDarkMode(!darkMode)}
-              className="btn btn-circle btn-ghost"
-              aria-label="Toggle dark mode"
-            >
-              {darkMode ? <FaSun className="text-yellow-500" /> : <FaMoon className="text-gray-600" />}
-            </button>
           </div>
 
           {/* Chat Messages */}
@@ -100,33 +98,13 @@ const ChatPage = () => {
             )}
           </div>
 
-          {/* Message Input */}
-          <div className="p-4 border-t dark:border-gray-700">
-            <div className="flex items-end gap-2">
-              <textarea
-                value={inputMessage}
-                onChange={(e) => setInputMessage(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" && !e.shiftKey) {
-                    e.preventDefault();
-                    handleSendMessage();
-                  }
-                }}
-                placeholder="Send a message..."
-                className="textarea textarea-bordered flex-1 resize-none focus:outline-none focus:border-primary"
-                rows={1}
-              />
-              <AudioRecorder onAudioSubmit={console.log} />
-              <button
-                onClick={handleSendMessage}
-                disabled={!inputMessage.trim() || !activeChat}
-                className="btn btn-primary btn-circle"
-                aria-label="Send message"
-              >
-                <FaPaperPlane />
-              </button>
-            </div>
-          </div>
+          {/* Chat Input */}
+          <ChatInput
+            inputMessage={inputMessage}
+            setInputMessage={setInputMessage}
+            handleSendMessage={handleSendMessage}
+            isLoading={isLoading}
+          />
         </div>
       </div>
     </div>
