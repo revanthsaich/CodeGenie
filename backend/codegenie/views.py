@@ -1,6 +1,7 @@
-import requests
-from django.http import JsonResponse
+from django.http import StreamingHttpResponse, JsonResponse
 from rest_framework.views import APIView
+import requests
+import json
 
 OLLAMA_API_URL = "http://localhost:11434/api/generate"
 
@@ -14,17 +15,26 @@ class GenerateCodeView(APIView):
         payload = {
             "model": "codellama:7b",
             "prompt": description,
-            "stream": False  # Disable streaming for simplicity
+            "stream": True
         }
 
         try:
-            response = requests.post(OLLAMA_API_URL, json=payload)
+            response = requests.post(OLLAMA_API_URL, json=payload, stream=True)
             response.raise_for_status()
-            generated_response = response.json()
 
-            # Extract the generated code from the response
-            generated_code = generated_response.get("response", "")
-            return JsonResponse({'code': generated_code})
+            def generate():
+                for line in response.iter_lines(decode_unicode=True):
+                    if line:
+                        try:
+                            chunk = json.loads(line)
+                            if "response" in chunk:
+                                yield f"data: {json.dumps({'code': chunk['response']})}\n\n"
+                            if chunk.get("done", False):
+                                break
+                        except json.JSONDecodeError:
+                            continue  # Ignore malformed JSON chunks
+
+            return StreamingHttpResponse(generate(), content_type="text/event-stream")
 
         except requests.exceptions.RequestException as e:
             return JsonResponse({'error': str(e)}, status=500)

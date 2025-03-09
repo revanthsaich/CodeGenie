@@ -1,18 +1,41 @@
 import React, { useState, useRef, useEffect } from "react";
-import { FiMenu, FiMic, FiSend, FiX } from "react-icons/fi";
-import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
-import { atomDark } from "react-syntax-highlighter/dist/esm/styles/prism";
-
-import userIcon from '../assets/user.jpg'; // Corrected path
-import aiIcon from '../assets/agent.jpg'; // Corrected path
+import Sidebar from "../components/Sidebar";
+import ChatContainer from "../components/ChatContainer";
+import InputBar from "../components/InputBar";
+import userIcon from '../assets/user.png';
+import aiIcon from '../assets/agent.png';
+import { GoSidebarCollapse, GoSidebarExpand } from "react-icons/go"; // Import icons
 
 const ChatPage = () => {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [message, setMessage] = useState("");
   const [chatHistory, setChatHistory] = useState([]);
   const [isRecording, setIsRecording] = useState(false);
-  const [isDarkTheme, setIsDarkTheme] = useState(false); // Theme state
+  const [isDarkTheme, setIsDarkTheme] = useState(false); // Theme toggler state
+  const [isLoading, setIsLoading] = useState(false); // Track loading state
+  const [isStreaming, setIsStreaming] = useState(false); // Track streaming state
+  const abortControllerRef = useRef(null); // Reference to AbortController
   const chatContainerRef = useRef(null);
+
+  // State for animated "Generating..." text
+  const [generatingText, setGeneratingText] = useState("Generating...");
+
+  useEffect(() => {
+    if (isStreaming) {
+      // Create an interval to animate the dots
+      const interval = setInterval(() => {
+        setGeneratingText((prevText) => {
+          if (prevText === "Generating...") return "Generating..";
+          if (prevText === "Generating..") return "Generating.";
+          return "Generating...";
+        });
+      }, 500); // Change every 500ms
+
+      return () => clearInterval(interval); // Cleanup interval on unmount or when streaming stops
+    } else {
+      setGeneratingText("Generating..."); // Reset text when streaming stops
+    }
+  }, [isStreaming]);
 
   const dummyChats = [
     { id: 1, text: "How to implement authentication in React?", timestamp: "2 hours ago" },
@@ -20,8 +43,12 @@ const ChatPage = () => {
     { id: 3, text: "Best practices for React hooks", timestamp: "1 day ago" }
   ];
 
-  const handleSend = () => {
-    if (!message.trim()) return;
+  const handleSend = async () => {
+    if (!message.trim() || isLoading) return;
+
+    setIsLoading(true);
+    setIsStreaming(true);
+    abortControllerRef.current = new AbortController();
 
     const newChat = {
       id: Date.now(),
@@ -29,14 +56,78 @@ const ChatPage = () => {
       content: message
     };
 
-    const aiResponse = {
+    setChatHistory([...chatHistory, newChat]);
+    setMessage("");
+
+    const aiResponsePlaceholder = {
       id: Date.now() + 1,
       type: "ai",
-      content: "```javascript\nconst example = () => {\n  console.log('Hello from CodeGenie AI!');\n}\n```"
+      content: generatingText // Use the animated "Generating..." text as placeholder
     };
 
-    setChatHistory([...chatHistory, newChat, aiResponse]);
-    setMessage("");
+    setChatHistory((prevHistory) => [...prevHistory, aiResponsePlaceholder]);
+
+    try {
+      const response = await fetch("http://127.0.0.1:8000/api/generate-code", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ description: message }),
+        signal: abortControllerRef.current.signal
+      });
+
+      if (!response.ok) throw new Error("Failed to generate code");
+
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let accumulatedCode = "";
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        const chunk = decoder.decode(value, { stream: true });
+        const lines = chunk.split("\n");
+
+        for (const line of lines) {
+          if (line.startsWith("data: ")) {
+            const data = JSON.parse(line.slice(6));
+            accumulatedCode += data.code;
+
+            setChatHistory((prevHistory) =>
+              prevHistory.map((chat) =>
+                chat.id === aiResponsePlaceholder.id
+                  ? { ...chat, content: accumulatedCode }
+                  : chat
+              )
+            );
+          }
+        }
+      }
+    } catch (error) {
+      if (error.name === "AbortError") {
+        console.log("Streaming aborted by user.");
+      } else {
+        console.error("Error generating code:", error);
+
+        setChatHistory((prevHistory) =>
+          prevHistory.map((chat) =>
+            chat.id === aiResponsePlaceholder.id
+              ? { ...chat, content: "Sorry, I encountered an error while generating the code." }
+              : chat
+          )
+        );
+      }
+    } finally {
+      setIsLoading(false);
+      setIsStreaming(false);
+    }
+  };
+
+  const handleStop = () => {
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+      setIsStreaming(false);
+    }
   };
 
   const handleKeyPress = (e) => {
@@ -50,106 +141,50 @@ const ChatPage = () => {
     setIsRecording(!isRecording);
   };
 
-  const toggleTheme = () => {
-    setIsDarkTheme(!isDarkTheme);
+  const toggleSidebar = () => {
+    setIsSidebarOpen(!isSidebarOpen);
   };
 
   useEffect(() => {
     if (chatContainerRef.current) {
-      chatContainerRef.current.scrollTop = chatContainerRef.current.scrollHeight;
+      setTimeout(() => {
+        chatContainerRef.current.scrollTo({
+          top: chatContainerRef.current.scrollHeight,
+          behavior: "smooth",
+        });
+      });
     }
   }, [chatHistory]);
 
   return (
-    <div className={`min-h-screen flex flex-col ${isDarkTheme ? 'bg-[#213555] text-[#D8C4B6]' : 'bg-gradient-to-br from-[#F5EFE7] to-[#3E5879]'}`}>
-      <div className="flex items-start">
-        <button
-          onClick={() => setIsSidebarOpen(true)}
-          className={`p-2 hover:bg-[#D8C4B6] rounded-lg transition-all duration-300 fixed top-20 left-4 z-50 ${isDarkTheme ? 'text-[#D8C4B6]' : 'text-[#213555]'}`}
-        >
-          <FiMenu className="w-6 h-6" />
-        </button>
+    <div className={`min-h-screen flex flex-col ${isDarkTheme ? 'dark' : ''}`}>
 
-        <div className={`fixed top-32 left-0 h-full w-80 bg-[#F5EFE7] shadow-2xl transform transition-transform duration-300 ease-in-out z-50 ${isSidebarOpen ? "translate-x-0" : "-translate-x-full"}`}>
-          <div className="p-6">
-            <div className="flex justify-between items-center mb-8">
-              <h2 className="text-xl font-bold text-[#213555]">Chat History</h2>
-              <button onClick={() => setIsSidebarOpen(false)} className="p-2 hover:bg-red-50 rounded-lg transition-all duration-300">
-                <FiX className="w-6 h-6 text-red-500" />
-              </button>
-            </div>
-            <div className="space-y-4">
-              {dummyChats.map((chat) => (
-                <div key={chat.id} className="p-4 hover:bg-[#D8C4B6] rounded-xl cursor-pointer transition-all duration-300 border border-gray-100 hover:border-[#3E5879]">
-                  <p className="text-[#213555] font-medium">{chat.text}</p>
-                  <span className="text-sm text-[#3E5879]">{chat.timestamp}</span>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-      </div>
+      {/* Top-Left Button to Toggle Sidebar */}
+      <button
+        onClick={toggleSidebar}
+        className="fixed top-4 my-[120px] left-4 z-50 p-2 bg-primary text-white rounded-full shadow-md hover:bg-secondary transition-all duration-300"
+      >
+        {isSidebarOpen ? <GoSidebarCollapse className="w-5 h-5" /> : <GoSidebarExpand className="w-5 h-5" />}
+      </button>
 
-      {/* Set the chat box width to 65% */}
-      <div className="flex-1 mx-auto px-6 py-8 overflow-y-auto" ref={chatContainerRef} style={{ width: '65%', marginTop: '80px', marginBottom: '80px' }}>
-        <div className={`bg-[#F5EFE7] rounded-2xl shadow-lg p-4 mb-0 ${isDarkTheme ? 'bg-[#3E5879]' : ''}`}>
-          {chatHistory.map((chat) => (
-            <div key={chat.id} className={`mb-6 flex ${chat.type === "user" ? "justify-end" : "justify-start"} animate__animated animate__fadeIn`}>
-              {chat.type === "ai" && (
-                <div className="flex items-center mr-2">
-                  <img src={aiIcon} alt="AI Icon" className="w-8 h-8" />
-                </div>
-              )}
-              <div className={`max-w-[50%] rounded-2xl p-3 shadow-md ${chat.type === "user" ? "bg-gradient-to-r from-[#213555] to-[#3E5879] text-white" : "bg-[#F5EFE7] text-[#213555]"}`}>
-                {chat.content.startsWith("```") ? (
-                  <div className="relative">
-                    <SyntaxHighlighter language="javascript" style={atomDark} className="rounded-xl !pt-10">
-                      {chat.content.replace(/```javascript\n|```/g, "")}
-                    </SyntaxHighlighter>
-                    <button className="absolute top-2 right-2 bg-[#3E5879] text-white px-3 py-1 rounded-lg text-sm hover:bg-[#213555] transition-all duration-300" onClick={() => navigator.clipboard.writeText(chat.content.replace(/```javascript\n|```/g, ""))}>
-                      Copy Code
-                    </button>
-                  </div>
-                ) : (
-                  <p className="leading-relaxed">{chat.content}</p>
-                )}
-              </div>
-              {chat.type === "user" && (
-                <div className="flex items-center ml-2">
-                  <img src={userIcon} alt="User Icon" className="w-8 h-8" />
-                </div>
-              )}
-            </div>
-          ))}
-        </div>
-      </div>
+      {/* Sidebar */}
+      <Sidebar isSidebarOpen={isSidebarOpen} setIsSidebarOpen={setIsSidebarOpen} dummyChats={dummyChats} />
 
-      {/* Set the input bar width to 65% */}
-      <div className={`bg-[#F5EFE7] rounded-2xl shadow-lg p-4 fixed bottom-0 left-1/2 transform -translate-x-1/2 ${isDarkTheme ? 'bg-[#3E5879]' : ''}`} style={{ width: '65%' }}>
-        <div className="flex items-center space-x-2">
-          <textarea
-            value={message}
-            onChange={(e) => setMessage(e.target.value)}
-            onKeyPress={handleKeyPress}
-            placeholder="Enter your coding query..."
-            className="flex-1 resize-none rounded-xl border border-gray-200 p-2 focus:outline-none focus:ring-2 focus:ring-[#3E5879] focus:border-transparent transition-all duration-300"
-            rows="1"
-          />
-          <button
-            onClick={toggleRecording}
-            className={`p-2 rounded-xl transition-all duration-300 ${isRecording ? "bg-red-500 text-white" : "hover:bg-red-50 text-red-500"}`}
-          >
-            <FiMic className="w-5 h-5" />
-          </button>
-          <button
-            onClick={handleSend}
-            disabled={!message.trim()}
-            className="p-2 bg-gradient-to-r from-[#213555] to-[#3E5879] text-white rounded-xl hover:opacity-90 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed shadow-md hover:shadow-lg"
-          >
-            <FiSend className="w-5 h-5" />
-          </button>
-        </div>
-      </div>
+      {/* Chat Container */}
+      <ChatContainer chatHistory={chatHistory} userIcon={userIcon} aiIcon={aiIcon} chatContainerRef={chatContainerRef} />
+
+      {/* Input Bar */}
+      <InputBar
+        message={message}
+        setMessage={setMessage}
+        handleKeyPress={handleKeyPress}
+        handleSend={handleSend}
+        isRecording={isRecording}
+        toggleRecording={toggleRecording}
+        isLoading={isLoading}
+        isStreaming={isStreaming}
+        handleStop={handleStop}
+      />
     </div>
   );
 };
