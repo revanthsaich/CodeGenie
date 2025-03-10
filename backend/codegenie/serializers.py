@@ -1,5 +1,7 @@
 from rest_framework import serializers
+from .models import ChatHistory
 
-class CodeGenerationSerializer(serializers.Serializer):
-    description = serializers.CharField(required=True)
-    code = serializers.CharField(read_only=True)
+class ChatHistorySerializer(serializers.ModelSerializer):
+    class Meta:
+        model = ChatHistory
+        fields = ['id', 'prompt', 'response', 'created_at']  # Include relevant fields

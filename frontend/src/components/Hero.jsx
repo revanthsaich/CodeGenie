@@ -1,7 +1,20 @@
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
+import { useEffect } from "react";
 
 const Hero = () => {
+  const navigate = useNavigate();
+
+  // Check if the user is logged in
+  const isLoggedIn = !!localStorage.getItem("accessToken");
+
+  useEffect(() => {
+    // Redirect to Auth page if not logged in
+    if (!isLoggedIn) {
+      navigate("/auth");
+    }
+  }, [isLoggedIn, navigate]);
+
   return (
     <section className="hero h-[75vh] flex items-center justify-center bg-base-200 text-base-content">
       {/* Container for Centered Content */}
@@ -22,7 +35,7 @@ const Hero = () => {
         </p>
 
         {/* Call-to-Action Button */}
-        <Link to="/chat">
+        <Link to={isLoggedIn ? "/chat" : "/auth"}>
           <button className="btn btn-primary btn-lg">
             Start Coding Now
           </button>

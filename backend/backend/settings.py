@@ -1,5 +1,8 @@
 import os
 from pathlib import Path
+
+from django.db.backends.signals import connection_created
+from django.dispatch import receiver
 from dotenv import load_dotenv
 import dj_database_url
 # Load environment variables from .env file
@@ -98,7 +101,11 @@ DATABASES = {
         'NAME': BASE_DIR / 'db.sqlite3',
     }
 }
-
+@receiver(connection_created)
+def activate_foreign_keys(sender, connection, **kwargs):
+    if connection.vendor == 'sqlite':
+        cursor = connection.cursor()
+        cursor.execute("PRAGMA foreign_keys = ON;")
 
 
 # Password validation

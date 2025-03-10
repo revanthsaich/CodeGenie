@@ -2,8 +2,11 @@ from django.db import models
 from django.contrib.auth.models import AbstractUser
 
 class User(AbstractUser):
+    """
+    Custom User model extending AbstractUser.
+    """
 
-    # Add related_name to avoid clashes
+    # Add related_name to avoid clashes with default User model
     groups = models.ManyToManyField(
         'auth.Group',
         verbose_name='groups',

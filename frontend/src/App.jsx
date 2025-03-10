@@ -3,7 +3,7 @@ import { BrowserRouter as Router, Route, Routes } from "react-router-dom";
 import Navbar from "./components/Navbar";
 import Home from "./pages/Home"; // Import the HomePage component
 import ChatPage from "./pages/ChatPage";
-
+import Auth from "./pages/Auth";
 const App = () => {
   return (
     <Router>
@@ -17,6 +17,7 @@ const App = () => {
 
         {/* Chat Route */}
         <Route path="/chat" element={<ChatPage />} />
+        <Route path="/auth" element={<Auth />} />
       </Routes>
     </Router>
   );

@@ -22,7 +22,7 @@ const Features = () => {
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: index * 0.6 }}
-              className="p-6 bg-base-100 rounded-lg shadow-lg transform transition-transform duration-300 hover:scale-95 hover:bg-gray-200"
+              className="p-6 bg-base-100 rounded-lg shadow-lg transform transition-transform duration-300 hover:scale-95 hover:bg-base-200"
             >
               <div className="text-3xl text-primary mb-4">
                 {feature.icon}
