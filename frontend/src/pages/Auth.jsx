@@ -12,13 +12,7 @@ const Auth = () => {
   const [isLogin, setIsLogin] = useState(false); // Default: Registration mode
   const navigate = useNavigate();
 
-  // Theme State
-  const [theme, setTheme] = useState(localStorage.getItem("theme") || "light");
 
-  useEffect(() => {
-    document.documentElement.setAttribute("data-theme", theme);
-    localStorage.setItem("theme", theme);
-  }, [theme]);
 
   const validateInputs = () => {
     if (!username || !password) {
@@ -100,10 +94,6 @@ const Auth = () => {
     }
   };
 
-  const toggleTheme = () => {
-    const newTheme = theme === "light" ? "dark" : "light";
-    setTheme(newTheme);
-  };
 
   return (
     <div className="flex justify-center items-center h-screen bg-base-200">
@@ -111,11 +101,6 @@ const Auth = () => {
         <h2 className="text-2xl font-semibold mb-4 text-primary">
           {isLogin ? "Login" : "Register"}
         </h2>
-
-        {/* Theme Toggle Button */}
-        <button onClick={toggleTheme} className="btn btn-sm btn-outline mb-4">
-          Switch to {theme === "light" ? "Dark" : "Light"} Mode
-        </button>
 
         <input
           type="text"
