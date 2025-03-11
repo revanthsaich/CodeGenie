@@ -6,23 +6,32 @@ from .models import ChatHistory
 from rest_framework.response import Response
 from .models import ChatHistory
 from .serializers import ChatHistorySerializer  # Serializer for ChatHistory
-
+from rest_framework.permissions import IsAuthenticated
 OLLAMA_API_URL = "http://localhost:11434/api/generate"
+import logging
 
-
+logger = logging.getLogger(__name__)
 
 
 class ChatHistoryView(APIView):
-    def get(self, request, *args, **kwargs):
-        # Fetch all chat history entries
-        chats = ChatHistory.objects.all().order_by('-created_at')  # Order by latest first
-        serializer = ChatHistorySerializer(chats, many=True)  # Serialize the data
-        return Response(serializer.data)
-    
+    permission_classes = [IsAuthenticated]
 
-
+    def get(self, request):
+        chat_history = ChatHistory.objects.filter(user=request.user).order_by("-created_at")[:10]  # Limit to latest 10
+        chat_data = [
+            {
+                "id": chat.id,
+                "prompt": chat.prompt,
+                "response": chat.response,
+                "created_at": chat.created_at,
+            }
+            for chat in chat_history
+        ]
+        return Response(chat_data)
 
 class GenerateCodeView(APIView):
+    permission_classes = [IsAuthenticated]  # Protect this view
+
     def post(self, request, *args, **kwargs):
         description = request.data.get('description', '') + (
             " If the prompt is theoretical or a definition, limit the response to 100 words. "
@@ -36,7 +45,7 @@ class GenerateCodeView(APIView):
         payload = {
             "model": "codellama:7b",
             "prompt": description,
-            "stream": True,
+            "stream": True,  # Enable streaming
             "options": {
                 "temperature": 0.2,
                 "top_p": 0.5,
@@ -49,28 +58,38 @@ class GenerateCodeView(APIView):
 
             accumulated_response = ""  # To accumulate the full response
 
+            def save_to_db():
+                if accumulated_response:
+                    logger.info(f"Saving chat history: User={request.user}, Prompt={description}, Response={accumulated_response}")
+                    ChatHistory.objects.create(
+                        user=request.user,
+                        prompt=description,
+                        response=accumulated_response
+                    )
+                else:
+                    logger.error("No accumulated response to save.")
+
             def generate():
-                nonlocal accumulated_response  # Use nonlocal to modify the variable
+                nonlocal accumulated_response
                 for line in response.iter_lines(decode_unicode=True):
                     if line:
                         try:
                             chunk = json.loads(line)
                             if "response" in chunk:
                                 accumulated_response += chunk["response"]
+                                print(chunk["response"])  # Log the chunk for debugging
                                 yield f"data: {json.dumps({'code': chunk['response']})}\n\n"
                             if chunk.get("done", False):
                                 break
                         except json.JSONDecodeError:
-                            continue  # Ignore malformed JSON chunks
+                            logger.warning(f"Malformed JSON chunk: {line}")
+                            continue
+                # Call save_to_db **after** streaming is done
+                save_to_db()
 
-            # Save the prompt and response to the database after streaming is complete
-            def save_to_db():
-                ChatHistory.objects.create(prompt=description, response=accumulated_response)
-
-            # Return the streaming response and save data after completion
-            streaming_response = StreamingHttpResponse(generate(), content_type="text/event-stream")
-            streaming_response.on_close = save_to_db  # Save data when streaming ends
-            return streaming_response
+            # Create the streaming response
+            return StreamingHttpResponse(generate(), content_type="text/event-stream")
 
         except requests.exceptions.RequestException as e:
+            logger.error(f"Error communicating with Ollama API: {str(e)}")
             return JsonResponse({'error': str(e)}, status=500)

@@ -4,6 +4,9 @@ import { atomDark } from "react-syntax-highlighter/dist/esm/styles/prism";
 import { FaRegCopy } from "react-icons/fa6";
 
 const MessageBubble = ({ chat, userIcon, aiIcon }) => {
+  // Ensure chat.content is defined
+  const content = chat?.content || "";
+
   // Regex to find code blocks
   const codeBlockRegex = /```(\w+)?\n([\s\S]*?)```/g;
 
@@ -12,10 +15,10 @@ const MessageBubble = ({ chat, userIcon, aiIcon }) => {
   let match;
   let lastIndex = 0;
 
-  while ((match = codeBlockRegex.exec(chat.content)) !== null) {
+  while ((match = codeBlockRegex.exec(content)) !== null) {
     // Push text before code block
     if (match.index > lastIndex) {
-      parts.push({ type: "text", content: chat.content.slice(lastIndex, match.index) });
+      parts.push({ type: "text", content: content.slice(lastIndex, match.index) });
     }
     // Push code block
     parts.push({ type: "code", language: match[1] || "plaintext", content: match[2] });
@@ -23,8 +26,8 @@ const MessageBubble = ({ chat, userIcon, aiIcon }) => {
   }
 
   // Push remaining text after last code block
-  if (lastIndex < chat.content.length) {
-    parts.push({ type: "text", content: chat.content.slice(lastIndex) });
+  if (lastIndex < content.length) {
+    parts.push({ type: "text", content: content.slice(lastIndex) });
   }
 
   return (

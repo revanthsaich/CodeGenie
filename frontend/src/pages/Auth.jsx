@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import axios from "axios";
+import api from "../utils/api";
 
 const API_BASE_URL = "http://localhost:8000/api/auth"; // Backend URL
 
@@ -20,23 +20,65 @@ const Auth = () => {
     localStorage.setItem("theme", theme);
   }, [theme]);
 
+  const validateInputs = () => {
+    if (!username || !password) {
+      setMessage("Username and password are required");
+      return false;
+    }
+
+    if (!isLogin && !email) {
+      setMessage("Email is required for registration");
+      return false;
+    }
+
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!isLogin && !emailRegex.test(email)) {
+      setMessage("Please enter a valid email address");
+      return false;
+    }
+
+    return true;
+  };
+
   const handleRegister = async () => {
+    if (!validateInputs()) return;
+
     try {
-      const response = await axios.post(`${API_BASE_URL}/register/`, {
+      const response = await api.post(`${API_BASE_URL}/register/`, {
         username,
         password,
         email,
       });
+
       setMessage(response.data.message);
-      setIsLogin(true); // Switch to login mode after successful registration
+
+      // Automatically log in the user after registration
+      const loginResponse = await api.post(`${API_BASE_URL}/login/`, {
+        username,
+        password,
+      });
+
+      localStorage.setItem("accessToken", loginResponse.data.access);
+      localStorage.setItem("refreshToken", loginResponse.data.refresh);
+      localStorage.setItem("username", username);
+
+      window.dispatchEvent(new Event("storage")); // Force Navbar Update
+
+      navigate("/chat"); // Redirect to chat page
     } catch (error) {
-      setMessage("Registration failed");
+      if (error.response && error.response.data) {
+        setMessage(error.response.data.error || "Registration failed");
+      } else {
+        setMessage("An unexpected error occurred");
+      }
     }
   };
 
   const handleLogin = async () => {
+    if (!validateInputs()) return;
+
     try {
-      const response = await axios.post(`${API_BASE_URL}/login/`, {
+      const response = await api.post(`${API_BASE_URL}/login/`, {
         username,
         password,
       });
@@ -45,13 +87,22 @@ const Auth = () => {
       localStorage.setItem("refreshToken", response.data.refresh);
       localStorage.setItem("username", username);
 
-      window.dispatchEvent(new Event("storage")); // 🔥 Force Navbar Update
+      window.dispatchEvent(new Event("storage")); // Force Navbar Update
 
       setMessage("Login successful");
       navigate("/chat"); // Redirect to chat page
     } catch (error) {
-      setMessage("Invalid credentials");
+      if (error.response && error.response.data) {
+        setMessage(error.response.data.error || "Invalid credentials");
+      } else {
+        setMessage("An unexpected error occurred");
+      }
     }
+  };
+
+  const toggleTheme = () => {
+    const newTheme = theme === "light" ? "dark" : "light";
+    setTheme(newTheme);
   };
 
   return (
@@ -60,6 +111,11 @@ const Auth = () => {
         <h2 className="text-2xl font-semibold mb-4 text-primary">
           {isLogin ? "Login" : "Register"}
         </h2>
+
+        {/* Theme Toggle Button */}
+        <button onClick={toggleTheme} className="btn btn-sm btn-outline mb-4">
+          Switch to {theme === "light" ? "Dark" : "Light"} Mode
+        </button>
 
         <input
           type="text"

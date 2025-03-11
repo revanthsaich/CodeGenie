@@ -1,2 +1,43 @@
-venv
-env
+# Ignore virtual environments
+venv/
+env/
+
+# Ignore Python compiled files
+*/__pycache__/
+*.py[cod]
+
+# Ignore Django migrations (optional, depending on your workflow)
+*/migrations/
+
+# Ignore IDE/editor-specific files
+.vscode/
+.idea/
+*.sublime-project
+*.sublime-workspace
+
+# Ignore environment variables
+.env
+.env.local
+
+# Ignore log files
+*.log
+
+# Ignore database files (if using SQLite)
+*.sqlite3
+
+# Ignore distribution/build files
+dist/
+build/
+*.egg-info/
+
+# Ignore node_modules if using frontend tools
+node_modules/
+
+# Ignore macOS-specific files
+.DS_Store
+
+# Ignore Windows-specific files
+Thumbs.db
+
+# Ignore pytest cache
+.pytest_cache/

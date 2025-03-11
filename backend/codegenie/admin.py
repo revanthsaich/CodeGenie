@@ -1,12 +1,16 @@
 from django.contrib import admin
 from .models import ChatHistory
 
+@admin.register(ChatHistory)
 class ChatHistoryAdmin(admin.ModelAdmin):
-    # Remove 'user' from list_display since it no longer exists in the model
-    list_display = ('id', 'prompt', 'response', 'created_at')  # Include only valid fields
-    search_fields = ('prompt', 'response')  # Enable search by prompt and response
-    list_filter = ('created_at',)  # Add filters for the created_at field
-    ordering = ('-created_at',)  # Order by most recent first
-
-# Register the model with the admin site
-admin.site.register(ChatHistory, ChatHistoryAdmin)
+    # Display the user, prompt, response, and timestamp in the admin list view
+    list_display = ('id', 'user', 'prompt', 'response', 'created_at')
+    
+    # Add search functionality for the user's username, prompt, and response
+    search_fields = ('user__username', 'prompt', 'response')
+    
+    # Add filters to easily filter chat history by user or creation date
+    list_filter = ('user', 'created_at')
+    
+    # Optionally, order the entries by creation date (newest first)
+    ordering = ('-created_at',)

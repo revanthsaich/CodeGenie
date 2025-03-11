@@ -10,38 +10,78 @@ const ChatPage = () => {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [message, setMessage] = useState("");
   const [chatHistory, setChatHistory] = useState([]);
-  const [isRecording, setIsRecording] = useState(false);
-  const [isDarkTheme, setIsDarkTheme] = useState(false); // Theme toggler state
-  const [isLoading, setIsLoading] = useState(false); // Track loading state
-  const [isStreaming, setIsStreaming] = useState(false); // Track streaming state
-  const abortControllerRef = useRef(null); // Reference to AbortController
+  const [isLoading, setIsLoading] = useState(false);
+  const [isStreaming, setIsStreaming] = useState(false);
+  const abortControllerRef = useRef(null);
   const chatContainerRef = useRef(null);
 
-  // State for animated "Generating..." text
-  const [generatingText, setGeneratingText] = useState("Generating...");
-
-  useEffect(() => {
-    if (isStreaming) {
-      // Create an interval to animate the dots
-      const interval = setInterval(() => {
-        setGeneratingText((prevText) => {
-          if (prevText === "Generating...") return "Generating..";
-          if (prevText === "Generating..") return "Generating.";
-          return "Generating...";
-        });
-      }, 500); // Change every 500ms
-
-      return () => clearInterval(interval); // Cleanup interval on unmount or when streaming stops
-    } else {
-      setGeneratingText("Generating..."); // Reset text when streaming stops
-    }
-  }, [isStreaming]);
-
+  // Retrieve authToken from localStorage
+  const authToken = localStorage.getItem("accessToken");
   const dummyChats = [
     { id: 1, text: "How to implement authentication in React?", timestamp: "2 hours ago" },
     { id: 2, text: "Explain Redux middleware", timestamp: "5 hours ago" },
     { id: 3, text: "Best practices for React hooks", timestamp: "1 day ago" }
   ];
+  useEffect(() => {
+    if (!authToken) {
+      alert("You must be logged in to use this feature.");
+      window.location.href = "/auth"; // Redirect to login page
+    }
+  }, [authToken]);
+
+  useEffect(() => {
+    const fetchChatHistory = async () => {
+      const accessToken = localStorage.getItem("accessToken");
+  
+      if (!accessToken) {
+        console.error("No access token found. User must log in.");
+        return;
+      }
+  
+      try {
+        const response = await fetch("http://127.0.0.1:8000/api/chat-history", {
+          method: "GET",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${accessToken}`,
+          },
+        });
+  
+        if (!response.ok) {
+          throw new Error(`Failed to fetch chat history: ${response.statusText}`);
+        }
+  
+        const data = await response.json();
+  
+        // Format the chat history for the frontend
+        const formattedChats = [];
+        data.forEach((chat) => {
+          // Add user message
+          formattedChats.push({
+            id: chat.id,
+            type: "user",
+            content: chat.prompt,
+            timestamp: new Date(chat.created_at).toLocaleString(),
+          });
+  
+          // Add AI response
+          formattedChats.push({
+            id: chat.id + "-ai", // Unique ID for AI message
+            type: "ai",
+            content: chat.response,
+            timestamp: new Date(chat.created_at).toLocaleString(),
+          });
+        });
+  
+        setChatHistory(formattedChats);
+      } catch (error) {
+        console.error("Error fetching chat history:", error);
+      }
+    };
+  
+    fetchChatHistory();
+  }, []);
+  
 
   const handleSend = async () => {
     if (!message.trim() || isLoading) return;
@@ -53,7 +93,7 @@ const ChatPage = () => {
     const newChat = {
       id: Date.now(),
       type: "user",
-      content: message
+      content: message,
     };
 
     setChatHistory([...chatHistory, newChat]);
@@ -62,7 +102,7 @@ const ChatPage = () => {
     const aiResponsePlaceholder = {
       id: Date.now() + 1,
       type: "ai",
-      content: generatingText // Use the animated "Generating..." text as placeholder
+      content: "Generating...",
     };
 
     setChatHistory((prevHistory) => [...prevHistory, aiResponsePlaceholder]);
@@ -70,9 +110,12 @@ const ChatPage = () => {
     try {
       const response = await fetch("http://127.0.0.1:8000/api/generate-code", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${authToken}`, // Include auth token
+        },
         body: JSON.stringify({ description: message }),
-        signal: abortControllerRef.current.signal
+        signal: abortControllerRef.current.signal,
       });
 
       if (!response.ok) throw new Error("Failed to generate code");
@@ -137,10 +180,6 @@ const ChatPage = () => {
     }
   };
 
-  const toggleRecording = () => {
-    setIsRecording(!isRecording);
-  };
-
   const toggleSidebar = () => {
     setIsSidebarOpen(!isSidebarOpen);
   };
@@ -157,8 +196,7 @@ const ChatPage = () => {
   }, [chatHistory]);
 
   return (
-    <div className={`min-h-screen flex flex-col ${isDarkTheme ? 'dark' : ''}`}>
-
+    <div className="min-h-screen flex flex-col">
       {/* Top-Left Button to Toggle Sidebar */}
       <button
         onClick={toggleSidebar}
@@ -168,10 +206,19 @@ const ChatPage = () => {
       </button>
 
       {/* Sidebar */}
-      <Sidebar isSidebarOpen={isSidebarOpen} setIsSidebarOpen={setIsSidebarOpen} dummyChats={dummyChats} />
+      <Sidebar
+        isSidebarOpen={isSidebarOpen}
+        setIsSidebarOpen={setIsSidebarOpen}
+        dummyChats={dummyChats} // Pass chatHistory as dummyChats
+      />
 
       {/* Chat Container */}
-      <ChatContainer chatHistory={chatHistory} userIcon={userIcon} aiIcon={aiIcon} chatContainerRef={chatContainerRef} />
+      <ChatContainer
+        chatHistory={chatHistory}
+        userIcon={userIcon}
+        aiIcon={aiIcon}
+        chatContainerRef={chatContainerRef}
+      />
 
       {/* Input Bar */}
       <InputBar
@@ -179,8 +226,6 @@ const ChatPage = () => {
         setMessage={setMessage}
         handleKeyPress={handleKeyPress}
         handleSend={handleSend}
-        isRecording={isRecording}
-        toggleRecording={toggleRecording}
         isLoading={isLoading}
         isStreaming={isStreaming}
         handleStop={handleStop}

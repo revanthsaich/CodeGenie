@@ -1,7 +1,7 @@
 import React from "react";
 import { FiX } from "react-icons/fi";
 
-const Sidebar = ({ isSidebarOpen, setIsSidebarOpen, dummyChats }) => {
+const Sidebar = ({ isSidebarOpen, setIsSidebarOpen, dummyChats = [] }) => {
   return (
     <div
       className={`fixed top-32 left-0 h-full w-80 bg-base-100 shadow-2xl transform transition-transform duration-300 ease-in-out z-50 ${
@@ -22,15 +22,19 @@ const Sidebar = ({ isSidebarOpen, setIsSidebarOpen, dummyChats }) => {
 
         {/* Chat List */}
         <div className="space-y-4">
-          {dummyChats.map((chat) => (
-            <div
-              key={chat.id}
-              className="p-4 hover:bg-base-200 rounded-2xl cursor-pointer transition-all duration-300 border border-base-300 hover:border-primary"
-            >
-              <p className="text-base-content font-medium">{chat.text}</p>
-              <span className="text-sm text-neutral">{chat.timestamp}</span>
-            </div>
-          ))}
+          {dummyChats.length > 0 ? (
+            dummyChats.map((chat) => (
+              <div
+                key={chat.id}
+                className="p-4 hover:bg-base-200 rounded-2xl cursor-pointer transition-all duration-300 border border-base-300 hover:border-primary"
+              >
+                <p className="text-base-content font-medium">{chat.text}</p>
+                <span className="text-sm text-neutral">{chat.timestamp}</span>
+              </div>
+            ))
+          ) : (
+            <p className="text-center text-neutral">No chat history available</p>
+          )}
         </div>
       </div>
     </div>
